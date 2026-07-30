@@ -1,0 +1,2 @@
+dataset_id,tiff_count,pixel_count,min_celsius,p01_celsius,median_celsius,p99_celsius,max_celsius,mask_positive_pixels,mask_positive_fraction
+all,1867,611778560,-58.389999999999986,19.930000000000007,35.53000000000003,189.57000000000005,189.57000000000005,63441548,0.10370018197434051

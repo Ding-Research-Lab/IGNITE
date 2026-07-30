@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "dataset": "0003",
+  "notes": "RGB is intentionally locked to the left empty H landing pad. The approved thermal anchor shows the other pad carrying the aircraft, so these circles are not the same physical pad.",
+  "anchors": {
+    "primary": {
+      "frame_index": 870,
+      "video_time_s": 29.0,
+      "target": "left_empty_h_pad",
+      "note": "Intentionally differs from the approved thermal circle, which shows the other pad carrying the aircraft.",
+      "circle": {
+        "cx": 1944.0,
+        "cy": 1239.0,
+        "r": 132.626
+      }
+    }
+  }
+}

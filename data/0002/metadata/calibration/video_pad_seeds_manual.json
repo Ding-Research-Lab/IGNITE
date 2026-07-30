@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "dataset": "0002",
+  "notes": "Seeds lock both 90-frame anchor windows to the approved RGB H landing pad.",
+  "anchors": {
+    "primary": {
+      "frame_index": 8760,
+      "video_time_s": 292.0,
+      "target": "h_pad",
+      "circle": {
+        "cx": 1914.0,
+        "cy": 1299.0,
+        "r": 226.734
+      }
+    },
+    "secondary": {
+      "frame_index": 21600,
+      "video_time_s": 720.0,
+      "target": "h_pad",
+      "circle": {
+        "cx": 1827.0,
+        "cy": 1416.0,
+        "r": 252.533
+      }
+    }
+  }
+}

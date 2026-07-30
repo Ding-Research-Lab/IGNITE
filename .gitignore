@@ -1,0 +1,17 @@
+# Python/tooling
+__pycache__/
+*.py[cod]
+.DS_Store
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+work/
+reproduced/
+data/.cache/
+
+# The complete binary payload is uploaded to Hugging Face, not ordinary Git.
+# These rules do not remove local files from the working tree.
+data/*/raw/video.mp4
+data/*/raw/thermal/
+data/*/processed/aligned/

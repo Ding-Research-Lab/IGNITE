@@ -1,0 +1,24 @@
+[project]
+name = "fire-data-colocation"
+version = "1.0.0"
+description = "Create aligned FLIR radiometric TIFF and RGB samples using reviewed landing-pad anchors."
+requires-python = ">=3.12"
+dependencies = [
+    "matplotlib>=3.9",
+    "numpy>=1.26",
+    "opencv-python>=4.10",
+    "pandas>=2.2",
+    "pillow>=10.0",
+    "tifffile>=2024.8.10",
+]
+
+[dependency-groups]
+notebook = [
+    "ipykernel>=6.29",
+    "jupyterlab>=4.0",
+    "nbconvert>=7.0",
+    "nbformat>=5.0",
+]
+
+[tool.uv]
+package = false

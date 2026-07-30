@@ -1,0 +1,39 @@
+{
+  "dataset_id": "0002",
+  "source_sequence_id": "20260226_030445",
+  "strategy": "dual_anchor_window_90",
+  "paths": {
+    "raw_video": "data/0002/raw/video.mp4",
+    "raw_tiff_dir": "data/0002/raw/thermal",
+    "processed_dir": "data/0002/processed",
+    "transform": "data/0002/metadata/transform.json",
+    "pad_circles": "data/0002/metadata/calibration/pad_circles_manual.json",
+    "video_pad_seeds": "data/0002/metadata/calibration/video_pad_seeds_manual.json"
+  },
+  "time_mapping": {
+    "tiff_start": "20260226_030455",
+    "tiff_end": "20260226_031225",
+    "video_start": "4:47",
+    "video_end": "12:17",
+    "anchors": [
+      {
+        "name": "primary",
+        "requested": "4:52",
+        "selected": "4:52.500"
+      },
+      {
+        "name": "secondary",
+        "requested": "12:00",
+        "selected": "12:00.567"
+      }
+    ]
+  },
+  "mask": {
+    "threshold_celsius": 80.0,
+    "threshold_dn": 8829
+  },
+  "counts": {
+    "raw_tiff": 468,
+    "aligned": 451
+  }
+}
