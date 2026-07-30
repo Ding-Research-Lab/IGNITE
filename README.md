@@ -1,9 +1,9 @@
 # IGNITE: A Multimodal UAV-Collected Dataset for Wildfire Detection
 
-This repository contains code and release metadata for aligning FLIR TIFF frames with RGB video frames. The four released sequences contain 1,867 approved aligned samples. The complete binary payload is intended for the companion Hugging Face Dataset; the local `data/` directory is the upload-ready copy.
+This repository contains code and release metadata for aligning FLIR TIFF frames with RGB video frames. The four released sequences contain 1,867 approved aligned samples. The complete binary payload is intended for the companion [Hugging Face Dataset](https://huggingface.co/datasets/Kyoma001/IGNITE-fire-dataset); the local `data/` directory is the upload-ready copy.
 
 <p align="center">
-  <img src="notebooks/sample_plot.png" alt="Sample plot" width="75%">
+  <img src="https://raw.githubusercontent.com/Ding-Research-Lab/IGNITE/main/notebooks/sample_plot.png" alt="Sample plot" width="75%">
 </p>
 
 ## Quick start for dataset download
