@@ -103,9 +103,16 @@ The `masks` stage is idempotent and writes `mask_80c.png` beside each aligned TI
 
 
 ## Acknowledgment
-The authors thank the prescribed-fire personnel and land-management partners who made the data collection possible, especially Deborah Landau, Gabriel Cahalan, and Chase McLean from The Nature Conservancy, and Miles Roy of American University. This research is based upon work supported in part by the NSF (\#2536664) and NASA ESTO Program (80NSSC25K7777). The views and conclusions contained herein are those of the authors and should not be interpreted as necessarily representing the official policies, either expressed or implied, of the U.S. Government.
+The authors thank the prescribed-fire personnel and land-management partners who made the data collection possible, especially Dr. Deborah Landau, Mr. Gabriel Cahalan, and Mr. Chase McLean from The Nature Conservancy, and Mr. Miles Roy of American University. This research is based upon work supported in part by the NSF (\#2536664) and NASA ESTO Program (80NSSC25K7777). The views and conclusions contained herein are those of the authors and should not be interpreted as necessarily representing the official policies, either expressed or implied, of the U.S. Government.
 
 
 ## Citation
+If you find this work useful for your research, please cite our paper:
 
-TODO
+```bibtex
+@article{wang2026ignite,
+  title  = {IGNITE: A Multimodal UAV-Collected Dataset for Wildfire Detection},
+  author = {Yiding Wang and Zhaoxi Zhang and Chenzhi Zhao and Zhangyu Guan and Dong L. Wu and Leah Ding},
+  year   = {2026}
+}
+```
