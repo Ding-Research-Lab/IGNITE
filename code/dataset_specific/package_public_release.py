@@ -401,6 +401,7 @@ def build_viewer_row(dataset_id: str, row: dict[str, Any]) -> dict[str, Any]:
         "sequence_id": dataset_id,
         "aligned_id": row["aligned_id"],
         "thermal_file_name": repository_path("thermal_png_path"),
+        "thermal_tiff_file_name": repository_path("thermal_tiff_path"),
         "rgb_file_name": repository_path("video_png_path"),
         "overlay_file_name": repository_path("overlay_png_path"),
         "mask_80c_file_name": repository_path("mask_80c_path"),
@@ -416,6 +417,7 @@ def build_viewer_row(dataset_id: str, row: dict[str, Any]) -> dict[str, Any]:
     }
     for field in (
         "thermal_file_name",
+        "thermal_tiff_file_name",
         "rgb_file_name",
         "overlay_file_name",
         "mask_80c_file_name",

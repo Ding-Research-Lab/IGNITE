@@ -23,18 +23,20 @@ IGNITE contains radiometric FLIR TIFF frames aligned with RGB video frames from 
 
 ## Dataset Viewer
 
-Each Viewer row is one aligned sample. The four image columns are:
+Each Viewer row is one aligned sample. The five image columns are:
 
 - `thermal`: display rendering of the radiometric TIFF
+- `thermal_tiff`: original 16-bit radiometric TIFF
 - `rgb`: aligned RGB video frame
 - `overlay`: thermal/RGB visual overlay
 - `mask_80c`: binary mask for temperatures greater than or equal to 80 °C
 
-The original 16-bit radiometric image is exposed as `thermal_tiff_path` instead of an image preview because ordinary browser rendering does not preserve its calibrated intensity semantics. `thermal_source_path` points to the corresponding TIFF in the raw sequence.
+`thermal_tiff` is decoded losslessly as a Pillow `I;16` image. Convert it to a NumPy array to access the calibrated `uint16` digital numbers; an ordinary browser preview may not preserve their intensity semantics. The backward-compatible `thermal_tiff_path` column identifies the processed TIFF, while `thermal_source_path` points to the corresponding TIFF in the raw sequence.
 
 The default `train` view contains all 1,854 approved samples. `sequence_id` identifies the source sequence (`0001`–`0004`); these acquisition sequences are not train/test partitions.
 
 ```python
+import numpy as np
 from datasets import load_dataset
 
 dataset = load_dataset(
@@ -43,10 +45,13 @@ dataset = load_dataset(
 )
 
 sample = dataset[0]
-sample["thermal"], sample["rgb"], sample["overlay"], sample["mask_80c"]
+sample["thermal"], sample["thermal_tiff"], sample["rgb"], sample["overlay"], sample["mask_80c"]
+
+thermal_dn = np.asarray(sample["thermal_tiff"], dtype=np.uint16)
+temperature_c = thermal_dn * 0.04 - 273.15
 ```
 
-In addition to the four image columns, each row includes alignment identity and timing, RGB frame index, visual alignment score, fire-mask statistics, and paths to the processed and source radiometric TIFFs.
+In addition to the five image columns, each row includes alignment identity and timing, RGB frame index, visual alignment score, fire-mask statistics, and paths to the processed and source radiometric TIFFs.
 
 ## Quick start for complete download
 

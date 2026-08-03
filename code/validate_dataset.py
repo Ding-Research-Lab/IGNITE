@@ -51,6 +51,7 @@ VIEWER_METADATA_FIELDS = (
     "sequence_id",
     "aligned_id",
     "thermal_file_name",
+    "thermal_tiff_file_name",
     "rgb_file_name",
     "overlay_file_name",
     "mask_80c_file_name",
@@ -198,6 +199,7 @@ def validate_viewer_metadata(root: Path) -> int:
         aligned_root = f"{sequence_id}/processed/aligned/{aligned_id}"
         expected_paths = {
             "thermal_file_name": f"{aligned_root}/thermal.png",
+            "thermal_tiff_file_name": f"{aligned_root}/thermal.tiff",
             "rgb_file_name": f"{aligned_root}/video.png",
             "overlay_file_name": f"{aligned_root}/overlay.png",
             "mask_80c_file_name": f"{aligned_root}/mask_80c.png",
