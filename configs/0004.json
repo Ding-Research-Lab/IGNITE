@@ -11,9 +11,9 @@
   },
   "time_mapping": {
     "tiff_start": "20260227_023453",
-    "tiff_end": "20260227_024329",
+    "tiff_end": "20260227_024316",
     "video_start": "1:08",
-    "video_end": "9:44",
+    "video_end": "9:31",
     "anchors": [
       {
         "name": "primary",
@@ -28,6 +28,6 @@
   },
   "counts": {
     "raw_tiff": 535,
-    "aligned": 517
+    "aligned": 504
   }
 }

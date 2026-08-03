@@ -7,6 +7,7 @@ working ``raw_data``, ``output`` or ``fire_recoding`` directories.
 
 from __future__ import annotations
 
+import argparse
 import csv
 import hashlib
 import json
@@ -20,6 +21,7 @@ import matplotlib
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+import cv2
 import numpy as np
 import tifffile
 from PIL import Image
@@ -29,6 +31,13 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 PROJECT_ROOT = REPO_ROOT.parent
 FIRE_RECORDING_ROOT = PROJECT_ROOT.parent / "fire_recoding"
 DATA_ROOT = REPO_ROOT / "data"
+
+EXPECTED_VIEWER_COUNTS = {
+    "0001": 439,
+    "0002": 451,
+    "0003": 460,
+    "0004": 504,
+}
 
 
 DATASETS: list[dict[str, Any]] = [
@@ -97,9 +106,9 @@ DATASETS: list[dict[str, Any]] = [
         "manual_circles": PROJECT_ROOT / "output/20260227_023453_single_anchor_review/pad_circles_manual.json",
         "video_seeds": None,
         "tiff_start": "20260227_023453",
-        "tiff_end": "20260227_024329",
+        "tiff_end": "20260227_024316",
         "video_start": "1:08",
-        "video_end": "9:44",
+        "video_end": "9:31",
         "anchors": [{"name": "primary", "requested": "9:28", "selected": "9:27.833"}],
     },
 ]
@@ -190,6 +199,45 @@ def load_rows(path: Path) -> list[dict[str, Any]]:
         return list(csv.DictReader(handle))
 
 
+def load_jsonl(path: Path) -> list[dict[str, Any]]:
+    return [
+        json.loads(line)
+        for line in path.read_text(encoding="utf-8").splitlines()
+        if line
+    ]
+
+
+def filter_rows_for_spec(
+    spec: dict[str, Any], rows: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    """Apply the published TIFF boundary to a working or release manifest."""
+
+    selected = [
+        row
+        for row in rows
+        if spec["tiff_start"] <= Path(str(row["tiff_name"])).stem <= spec["tiff_end"]
+    ]
+    if not selected:
+        raise ValueError(f"{spec['public_id']}: no manifest rows inside release boundary")
+    observed_boundary = (
+        Path(str(selected[0]["tiff_name"])).stem,
+        Path(str(selected[-1]["tiff_name"])).stem,
+    )
+    expected_boundary = (spec["tiff_start"], spec["tiff_end"])
+    if observed_boundary != expected_boundary:
+        raise ValueError(
+            f"{spec['public_id']}: manifest boundary {observed_boundary} "
+            f"!= {expected_boundary}"
+        )
+    expected_count = EXPECTED_VIEWER_COUNTS[spec["public_id"]]
+    if len(selected) != expected_count:
+        raise ValueError(
+            f"{spec['public_id']}: filtered manifest has {len(selected)} rows; "
+            f"expected {expected_count}"
+        )
+    return selected
+
+
 def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     if not rows:
@@ -211,6 +259,200 @@ def write_jsonl(path: Path, rows: list[dict[str, Any]]) -> None:
         "".join(json.dumps(row, ensure_ascii=False) + "\n" for row in rows),
         encoding="utf-8",
     )
+
+
+def parse_video_time_seconds(value: str) -> float:
+    parts = [float(part) for part in value.split(":")]
+    if len(parts) == 2:
+        return parts[0] * 60.0 + parts[1]
+    if len(parts) == 3:
+        return parts[0] * 3600.0 + parts[1] * 60.0 + parts[2]
+    raise ValueError(f"invalid video time: {value}")
+
+
+def probe_video(path: Path) -> dict[str, Any]:
+    capture = cv2.VideoCapture(str(path))
+    if not capture.isOpened():
+        raise ValueError(f"cannot open video: {path}")
+    fps = float(capture.get(cv2.CAP_PROP_FPS))
+    frame_count = int(round(capture.get(cv2.CAP_PROP_FRAME_COUNT)))
+    width = int(round(capture.get(cv2.CAP_PROP_FRAME_WIDTH)))
+    height = int(round(capture.get(cv2.CAP_PROP_FRAME_HEIGHT)))
+    capture.release()
+    if abs(fps - 30.0) > 1e-6 or (width, height) != (3840, 2160):
+        raise ValueError(f"unexpected video properties: {path}: {fps} fps {width}x{height}")
+    return {
+        "path": "raw/video.mp4",
+        "fps": fps,
+        "frame_count": frame_count,
+        "width": width,
+        "height": height,
+        "duration_s": frame_count / fps,
+    }
+
+
+def update_metadata_config(spec: dict[str, Any], rows: list[dict[str, Any]]) -> int:
+    """Refresh release-boundary and canonical-video facts in packaged provenance."""
+
+    dataset_id = spec["public_id"]
+    root = DATA_ROOT / dataset_id
+    config_path = root / "metadata/config.json"
+    config = json.loads(config_path.read_text(encoding="utf-8"))
+    config["args"].update(
+        {
+            "tiff_start": spec["tiff_start"],
+            "tiff_end": spec["tiff_end"],
+            "video_start": spec["video_start"],
+            "video_end": spec["video_end"],
+        }
+    )
+    config["video"] = probe_video(root / "raw/video.mp4")
+    raw_tiff_count = sum(
+        path.is_file() and path.suffix.lower() in {".tif", ".tiff"}
+        for path in (root / "raw/thermal").iterdir()
+    )
+    config["tiff_count_total"] = raw_tiff_count
+    config["tiff_count_effective"] = len(rows)
+    first, last = rows[0], rows[-1]
+    config["tiff_start_selected"] = {
+        "path": f"raw/thermal/{first['tiff_name']}",
+        "timestamp": first["tiff_time_iso"],
+    }
+    config["tiff_end_selected"] = {
+        "path": f"raw/thermal/{last['tiff_name']}",
+        "timestamp": last["tiff_time_iso"],
+    }
+    model_boundary = {
+        "tiff_start": first["tiff_time_iso"],
+        "tiff_end": last["tiff_time_iso"],
+        "video_start_s": parse_video_time_seconds(spec["video_start"]),
+        "video_end_s": parse_video_time_seconds(spec["video_end"]),
+    }
+    for model_name in ("initial_time_model", "final_time_model"):
+        if model_name in config:
+            config[model_name].update(model_boundary)
+    for model in config.get("final_time_models", {}).values():
+        model.update(model_boundary)
+    config["manifest_count"] = len(rows)
+    config_path.write_text(json.dumps(config, indent=2) + "\n", encoding="utf-8")
+    return raw_tiff_count
+
+
+def write_release_config(
+    spec: dict[str, Any], *, raw_tiff_count: int, aligned_count: int
+) -> dict[str, Any]:
+    dataset_id = spec["public_id"]
+    config = {
+        "dataset_id": dataset_id,
+        "source_sequence_id": spec["source_sequence_id"],
+        "strategy": spec["strategy"],
+        "paths": {
+            "raw_video": f"data/{dataset_id}/raw/video.mp4",
+            "raw_tiff_dir": f"data/{dataset_id}/raw/thermal",
+            "processed_dir": f"data/{dataset_id}/processed",
+            "transform": f"data/{dataset_id}/metadata/transform.json",
+            "pad_circles": f"data/{dataset_id}/metadata/calibration/pad_circles_manual.json",
+        },
+        "time_mapping": {
+            "tiff_start": spec["tiff_start"],
+            "tiff_end": spec["tiff_end"],
+            "video_start": spec["video_start"],
+            "video_end": spec["video_end"],
+            "anchors": spec["anchors"],
+        },
+        "mask": {"threshold_celsius": 80.0, "threshold_dn": 8829},
+        "counts": {"raw_tiff": raw_tiff_count, "aligned": aligned_count},
+    }
+    if spec["video_seeds"]:
+        config["paths"]["video_pad_seeds"] = (
+            f"data/{dataset_id}/metadata/calibration/video_pad_seeds_manual.json"
+        )
+    (REPO_ROOT / "configs" / f"{dataset_id}.json").write_text(
+        json.dumps(config, indent=2) + "\n", encoding="utf-8"
+    )
+    return config
+
+
+def catalog_summary(
+    spec: dict[str, Any], *, raw_tiff_count: int, aligned_count: int
+) -> dict[str, Any]:
+    return {
+        "dataset_id": spec["public_id"],
+        "source_sequence_id": spec["source_sequence_id"],
+        "strategy": spec["strategy"],
+        "raw_tiff_count": raw_tiff_count,
+        "aligned_count": aligned_count,
+        "tiff_start": spec["tiff_start"],
+        "tiff_end": spec["tiff_end"],
+        "anchors": " / ".join(anchor["selected"] for anchor in spec["anchors"]),
+    }
+
+
+def build_viewer_row(dataset_id: str, row: dict[str, Any]) -> dict[str, Any]:
+    """Convert a release manifest row to one ImageFolder metadata row."""
+
+    def repository_path(field: str) -> str:
+        relative = Path(row[field])
+        if relative.is_absolute() or ".." in relative.parts:
+            raise ValueError(f"{dataset_id}/{row['aligned_id']}: unsafe {field}: {relative}")
+        return (Path(dataset_id) / relative).as_posix()
+
+    viewer_row = {
+        "sequence_id": dataset_id,
+        "aligned_id": row["aligned_id"],
+        "thermal_file_name": repository_path("thermal_png_path"),
+        "rgb_file_name": repository_path("video_png_path"),
+        "overlay_file_name": repository_path("overlay_png_path"),
+        "mask_80c_file_name": repository_path("mask_80c_path"),
+        "tiff_time_iso": row["tiff_time_iso"],
+        "video_time": row["video_time"],
+        "video_time_s": float(row["video_time_s"]),
+        "video_frame_index": int(row["video_frame_index"]),
+        "visual_score": float(row["visual_score"]),
+        "mask_positive_pixels": int(row["mask_positive_pixels"]),
+        "mask_positive_fraction": float(row["mask_positive_fraction"]),
+        "thermal_tiff_path": repository_path("thermal_tiff_path"),
+        "thermal_source_path": repository_path("thermal_source_path"),
+    }
+    for field in (
+        "thermal_file_name",
+        "rgb_file_name",
+        "overlay_file_name",
+        "mask_80c_file_name",
+        "thermal_tiff_path",
+        "thermal_source_path",
+    ):
+        if not (DATA_ROOT / viewer_row[field]).is_file():
+            raise FileNotFoundError(DATA_ROOT / viewer_row[field])
+    return viewer_row
+
+
+def write_viewer_metadata(
+    all_rows: dict[str, list[dict[str, Any]]] | None = None,
+) -> list[dict[str, Any]]:
+    """Write the root ImageFolder metadata that defines one aligned pair per row."""
+
+    if all_rows is None:
+        all_rows = {
+            dataset_id: load_rows(DATA_ROOT / dataset_id / "processed/manifest.csv")
+            for dataset_id in EXPECTED_VIEWER_COUNTS
+        }
+    actual_counts = {dataset_id: len(rows) for dataset_id, rows in all_rows.items()}
+    if actual_counts != EXPECTED_VIEWER_COUNTS:
+        raise ValueError(
+            f"unexpected viewer sequence counts: {actual_counts}; "
+            f"expected {EXPECTED_VIEWER_COUNTS}"
+        )
+    viewer_rows = [
+        build_viewer_row(dataset_id, row)
+        for dataset_id in EXPECTED_VIEWER_COUNTS
+        for row in all_rows[dataset_id]
+    ]
+    identities = {(row["sequence_id"], row["aligned_id"]) for row in viewer_rows}
+    if len(identities) != len(viewer_rows):
+        raise ValueError("viewer metadata contains duplicate sequence/aligned IDs")
+    write_jsonl(DATA_ROOT / "metadata.jsonl", viewer_rows)
+    return viewer_rows
 
 
 def mask_from_tiff(source: Path, destination: Path) -> tuple[int, int]:
@@ -343,8 +585,15 @@ def build_dataset(spec: dict[str, Any]) -> tuple[dict[str, Any], list[dict[str, 
     metadata_dir = root / "metadata"
     calibration_dir = metadata_dir / "calibration"
     if root.exists():
-        # Only files inside the explicit release target are replaced.
-        shutil.rmtree(root)
+        # Preserve an explicitly replaced canonical video across release rebuilds.
+        for generated in (
+            raw_thermal,
+            root / "processed",
+            metadata_dir,
+            root / "statistics",
+        ):
+            if generated.exists():
+                shutil.rmtree(generated)
     raw_thermal.mkdir(parents=True)
     processed_aligned.mkdir(parents=True)
     metadata_dir.mkdir(parents=True)
@@ -352,9 +601,13 @@ def build_dataset(spec: dict[str, Any]) -> tuple[dict[str, Any], list[dict[str, 
 
     for source in sorted(spec["tiff_dir"].glob("*.tiff")):
         copy_file(source, raw_thermal / source.name)
-    copy_file(spec["video"], root / "raw/video.mp4")
+    canonical_video = root / "raw/video.mp4"
+    if not canonical_video.is_file():
+        copy_file(spec["video"], canonical_video)
 
-    rows = load_rows(spec["processed"] / "manifest.csv")
+    rows = filter_rows_for_spec(
+        spec, load_rows(spec["processed"] / "manifest.csv")
+    )
     normalized_rows: list[dict[str, Any]] = []
     for row in rows:
         # Historical working outputs use pairs/pair_id; the public release uses
@@ -414,40 +667,13 @@ def build_dataset(spec: dict[str, Any]) -> tuple[dict[str, Any], list[dict[str, 
         if source:
             sanitize_calibration_file(source, calibration_dir / filename)
 
-    config = {
-        "dataset_id": dataset_id,
-        "source_sequence_id": source_sequence_id,
-        "strategy": spec["strategy"],
-        "paths": {
-            "raw_video": f"data/{dataset_id}/raw/video.mp4",
-            "raw_tiff_dir": f"data/{dataset_id}/raw/thermal",
-            "processed_dir": f"data/{dataset_id}/processed",
-            "transform": f"data/{dataset_id}/metadata/transform.json",
-            "pad_circles": f"data/{dataset_id}/metadata/calibration/pad_circles_manual.json",
-        },
-        "time_mapping": {
-            "tiff_start": spec["tiff_start"],
-            "tiff_end": spec["tiff_end"],
-            "video_start": spec["video_start"],
-            "video_end": spec["video_end"],
-            "anchors": spec["anchors"],
-        },
-        "mask": {"threshold_celsius": 80.0, "threshold_dn": 8829},
-        "counts": {"raw_tiff": len(list(spec["tiff_dir"].glob("*.tiff"))), "aligned": len(rows)},
-    }
-    if spec["video_seeds"]:
-        config["paths"]["video_pad_seeds"] = f"data/{dataset_id}/metadata/calibration/video_pad_seeds_manual.json"
-    (REPO_ROOT / "configs" / f"{dataset_id}.json").write_text(json.dumps(config, indent=2) + "\n", encoding="utf-8")
-    summary = {
-        "dataset_id": dataset_id,
-        "source_sequence_id": source_sequence_id,
-        "strategy": spec["strategy"],
-        "raw_tiff_count": config["counts"]["raw_tiff"],
-        "aligned_count": len(rows),
-        "tiff_start": spec["tiff_start"],
-        "tiff_end": spec["tiff_end"],
-        "anchors": " / ".join(anchor["selected"] for anchor in spec["anchors"]),
-    }
+    raw_tiff_count = update_metadata_config(spec, normalized_rows)
+    write_release_config(
+        spec, raw_tiff_count=raw_tiff_count, aligned_count=len(normalized_rows)
+    )
+    summary = catalog_summary(
+        spec, raw_tiff_count=raw_tiff_count, aligned_count=len(normalized_rows)
+    )
     return summary, normalized_rows
 
 
@@ -470,7 +696,102 @@ def write_checksums() -> None:
             handle.write(f"{digest.hexdigest()}  {path.relative_to(DATA_ROOT).as_posix()}\n")
 
 
-def main() -> None:
+def update_checksum_entries(relative_paths: tuple[str, ...]) -> None:
+    """Refresh selected derived-file checksums without rehashing the full payload."""
+
+    checksum_path = DATA_ROOT / "checksums.sha256"
+    if not checksum_path.is_file():
+        raise FileNotFoundError(checksum_path)
+    entries: dict[str, str] = {}
+    for line in checksum_path.read_text(encoding="utf-8").splitlines():
+        digest, relative = line.split("  ", 1)
+        entries[relative] = digest
+    for relative in relative_paths:
+        path = DATA_ROOT / relative
+        digest = hashlib.sha256()
+        with path.open("rb") as source:
+            for chunk in iter(lambda: source.read(8 * 1024 * 1024), b""):
+                digest.update(chunk)
+        entries[relative] = digest.hexdigest()
+    checksum_path.write_text(
+        "".join(f"{entries[relative]}  {relative}\n" for relative in sorted(entries)),
+        encoding="utf-8",
+    )
+
+
+def refresh_existing_dataset(
+    spec: dict[str, Any],
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    """Apply current release boundaries to an existing packaged dataset."""
+
+    dataset_id = spec["public_id"]
+    root = DATA_ROOT / dataset_id
+    processed = root / "processed"
+    aligned_root = processed / "aligned"
+    rows = filter_rows_for_spec(spec, load_rows(processed / "manifest.csv"))
+    json_rows = filter_rows_for_spec(
+        spec, load_jsonl(processed / "manifest.jsonl")
+    )
+    json_by_id = {str(row["aligned_id"]): row for row in json_rows}
+    expected_ids = {str(row["aligned_id"]) for row in rows}
+    if set(json_by_id) != expected_ids:
+        raise ValueError(f"{dataset_id}: CSV/JSONL manifest identities differ")
+
+    actual_dirs = {path.name: path for path in aligned_root.iterdir() if path.is_dir()}
+    missing = sorted(expected_ids - set(actual_dirs))
+    if missing:
+        raise ValueError(f"{dataset_id}: missing aligned directories: {missing}")
+    for stale_id in sorted(set(actual_dirs) - expected_ids):
+        shutil.rmtree(actual_dirs[stale_id])
+
+    write_csv(processed / "manifest.csv", rows)
+    write_jsonl(
+        processed / "manifest.jsonl",
+        [json_by_id[str(row["aligned_id"])] for row in rows],
+    )
+    render_index(dataset_id, processed, rows)
+    raw_tiff_count = update_metadata_config(spec, rows)
+    write_release_config(
+        spec, raw_tiff_count=raw_tiff_count, aligned_count=len(rows)
+    )
+    return (
+        catalog_summary(
+            spec, raw_tiff_count=raw_tiff_count, aligned_count=len(rows)
+        ),
+        rows,
+    )
+
+
+def refresh_existing_release() -> None:
+    """Refresh derived release files without recopying the binary payload."""
+
+    summaries: list[dict[str, Any]] = []
+    all_rows: dict[str, list[dict[str, Any]]] = {}
+    computed: list[dict[str, Any]] = []
+    for spec in DATASETS:
+        summary, rows = refresh_existing_dataset(spec)
+        summaries.append(summary)
+        all_rows[spec["public_id"]] = rows
+        computed.append(
+            summarize_dataset(spec["public_id"], DATA_ROOT / spec["public_id"], rows)
+        )
+        print(f"{spec['public_id']}: {len(rows)} aligned samples refreshed", flush=True)
+    write_statistics(computed)
+    write_csv(
+        DATA_ROOT / "catalog.csv",
+        [
+            summary | {key: value for key, value in stats.items() if key != "counts"}
+            for summary, stats in zip(summaries, computed, strict=True)
+        ],
+    )
+    viewer_rows = write_viewer_metadata(all_rows)
+    write_checksums()
+    print(
+        f"Existing release refreshed: {len(viewer_rows)} viewer rows and checksums written."
+    )
+
+
+def build_release() -> None:
     DATA_ROOT.mkdir(parents=True, exist_ok=True)
     summaries: list[dict[str, Any]] = []
     all_rows: dict[str, list[dict[str, Any]]] = {}
@@ -492,13 +813,36 @@ def main() -> None:
     for summary, stats in zip(summaries, computed, strict=True):
         catalog_rows.append(summary | {key: value for key, value in stats.items() if key != "counts"})
     write_csv(DATA_ROOT / "catalog.csv", catalog_rows)
-    (DATA_ROOT / "README.md").write_text(
-        "# Local data tree\n\nThis directory is the complete upload payload for the Hugging Face Dataset. "
-        "Each aligned sample contains radiometric TIFF, thermal rendering, aligned RGB, overlay and `mask_80c.png`.\n",
-        encoding="utf-8",
-    )
+    viewer_rows = write_viewer_metadata(all_rows)
     write_checksums()
-    print("Release data, masks, statistics and checksums written.")
+    print(
+        f"Release data, masks, statistics, {len(viewer_rows)} viewer rows and checksums written."
+    )
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument(
+        "--viewer-metadata-only",
+        action="store_true",
+        help="Regenerate data/metadata.jsonl and its README/checksum entries only.",
+    )
+    mode.add_argument(
+        "--refresh-existing",
+        action="store_true",
+        help="Apply release boundaries and regenerate metadata/checksums in the existing data tree.",
+    )
+    args = parser.parse_args()
+    if args.viewer_metadata_only:
+        viewer_rows = write_viewer_metadata()
+        update_checksum_entries(("README.md", "metadata.jsonl"))
+        print(f"Viewer metadata: {len(viewer_rows)} aligned samples")
+        return
+    if args.refresh_existing:
+        refresh_existing_release()
+        return
+    build_release()
 
 
 if __name__ == "__main__":

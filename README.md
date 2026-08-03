@@ -1,6 +1,6 @@
 # IGNITE: A Multimodal UAV-Collected Dataset for Wildfire Detection
 
-This repository contains code and release metadata for aligning FLIR TIFF frames with RGB video frames. The four released sequences contain 1,867 approved aligned samples. The complete binary payload is intended for the companion [Hugging Face Dataset](https://huggingface.co/datasets/Kyoma001/IGNITE-fire-dataset); the local `data/` directory is the upload-ready copy.
+This repository contains code and release metadata for aligning FLIR TIFF frames with RGB video frames. The four released sequences contain 1,854 approved aligned samples. The complete binary payload is intended for the companion [Hugging Face Dataset](https://huggingface.co/datasets/Kyoma001/IGNITE-fire-dataset); the local `data/` directory is the upload-ready copy.
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/Ding-Research-Lab/IGNITE/main/notebooks/sample_plot.png" alt="Sample plot" width="75%">
@@ -14,12 +14,12 @@ cd IGNITE
 
 # Download the complete data payload from Hugging Face into data/.
 hf download Kyoma001/IGNITE-fire-dataset \
-  0001/ 0002/ 0003/ 0004/ catalog.csv checksums.sha256 statistics/ \
+  0001/ 0002/ 0003/ 0004/ metadata.jsonl catalog.csv checksums.sha256 statistics/ \
   --repo-type dataset \
   --local-dir data
 ```
 
-- The `data/` directory is about 18.3 GB.
+- The `data/` directory is about 26.1 GB.
 - For a **quick visual review**, open `data/<dataset_id>/processed/index.html` in a web browser, for example `data/0001/processed/index.html`.
 - `data/<dataset_id>/raw/` directory contains the complete source video and TIFF sequence.
 - `data/<dataset_id>/processed/` contains the aligned samples, manifest and browser index.
@@ -39,8 +39,8 @@ hf download Kyoma001/IGNITE-fire-dataset \
 | `0001` |  dual anchor | 482 | 439 | `01:23.233`, `08:13.233` |
 | `0002` |  dual anchor | 468 | 451 | `04:52.500`, `12:00.567` |
 | `0003` |  single anchor * | 651 | 460 | `00:29.533 (take-off anchor)` |
-| `0004` |  single anchor * | 535 | 517 | `09:27.833 (landing anchor)` |
-| **Total** |  | **2,136** | **1,867** |  |
+| `0004` |  single anchor * | 535 | 504 | `09:27.833 (landing anchor)` |
+| **Total** |  | **2,136** | **1,854** |  |
 
 *: Due to limitations in the data acquisition setup, `0003` does not include RGB video of the landing, while `0004` does not include thermal imagery of the takeoff. Therefore, both sequences were aligned using a single-anchor strategy.
 
