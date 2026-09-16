@@ -131,6 +131,7 @@ If you find this work useful for your research, please cite our paper:
 @article{wang2026ignite,
   title  = {IGNITE: A Multimodal UAV-Collected Dataset for Wildfire Detection},
   author = {Yiding Wang and Zhaoxi Zhang and Chenzhi Zhao and Zhangyu Guan and Dong L. Wu and Leah Ding},
+  booktitle = {Proceedings of the Second Workshop on Autonomous Drone Computing Systems and Applications (DroneSys 2026)},
   year   = {2026}
 }
 ```
