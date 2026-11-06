@@ -128,10 +128,14 @@ The authors thank the prescribed-fire personnel and land-management partners who
 If you find this work useful for your research, please cite our paper:
 
 ```bibtex
-@article{wang2026ignite,
-  title  = {IGNITE: A Multimodal UAV-Collected Dataset for Wildfire Detection},
-  author = {Yiding Wang and Zhaoxi Zhang and Chenzhi Zhao and Zhangyu Guan and Dong L. Wu and Leah Ding},
-  booktitle = {Proceedings of the Second Workshop on Autonomous Drone Computing Systems and Applications (DroneSys 2026)},
-  year   = {2026}
+
+@inproceedings{wang2026ignite,
+  title={IGNITE: A Multimodal UAV-Collected Dataset for Wildfire Detection},
+  author={Wang, Yiding and Zhang, Zhaoxi and Zhao, Chenzhi and Guan, Zhangyu and Wu, Dong L. and Ding, Leah},
+  booktitle={2026 IEEE/ACM Symposium on Edge Computing (SEC)},
+  pages={498--504},
+  year={2026},
+  publisher={IEEE},
+  doi={10.1109/SEC69832.2026.00049}
 }
 ```
